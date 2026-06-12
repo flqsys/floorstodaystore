@@ -2444,6 +2444,1120 @@ function ft_next_homepage_render_admin() {
     <?php
 }
 
+function ft_next_header_shortcode_url($url) {
+    $url = trim((string) $url);
+
+    if ($url === '' || $url === '#') {
+        return '#';
+    }
+
+    if (str_starts_with($url, '#')) {
+        return $url;
+    }
+
+    if (str_starts_with($url, '/')) {
+        return home_url($url);
+    }
+
+    if (preg_match('#^(?:https?:|mailto:|tel:)#i', $url)) {
+        return $url;
+    }
+
+    return home_url('/' . ltrim($url, '/'));
+}
+
+function ft_next_header_shortcode() {
+    static $assets_printed = false;
+
+    $settings = ft_next_homepage_settings();
+
+    if (($settings['show_header'] ?? '1') !== '1') {
+        return '';
+    }
+
+    $instance_id = wp_unique_id('ft-shortcode-header-');
+    $logo_text = (string) ($settings['logo_text'] ?? get_bloginfo('name'));
+    $logo_image = (string) ($settings['logo_image'] ?? '');
+    $service_area = (string) ($settings['service_area'] ?? '');
+    $phone = (string) ($settings['phone'] ?? '');
+    $phone_href = preg_replace('/[^0-9+]/', '', $phone);
+    $logo_size = trim((string) ($settings['logo_size'] ?? '250px'));
+    $primary_color = (string) ($settings['primary_color'] ?? '#155f99');
+    $foreground_color = (string) ($settings['foreground_color'] ?? '#1e1311');
+    $nav_items = is_array($settings['nav_items'] ?? null) ? $settings['nav_items'] : [];
+
+    if (!preg_match('/^\d+(?:\.\d+)?(?:px|rem|em|%)$/', $logo_size)) {
+        $logo_size = '250px';
+    }
+
+    ob_start();
+
+    if (!$assets_printed) {
+        $assets_printed = true;
+        ?>
+        <style id="ft-header-shortcode-styles">
+            .ft-sh-header,
+            .ft-sh-header * { box-sizing: border-box; }
+            .ft-sh-header {
+                position: sticky;
+                top: 0;
+                z-index: 999;
+                width: 100%;
+                background: #fff;
+                color: var(--ft-sh-foreground);
+                box-shadow: 0 1px 5px rgba(17, 24, 39, .12);
+                font-family: inherit;
+            }
+            .admin-bar .ft-sh-header { top: 32px; }
+            .ft-sh-inner {
+                width: min(100% - 32px, 1340px);
+                margin-inline: auto;
+            }
+            .ft-sh-topbar {
+                background: var(--ft-sh-primary);
+                color: #fff;
+                font-size: 14px;
+            }
+            .ft-sh-topbar-inner,
+            .ft-sh-main {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 20px;
+            }
+            .ft-sh-topbar-inner { min-height: 40px; }
+            .ft-sh-location,
+            .ft-sh-phone,
+            .ft-sh-utility,
+            .ft-sh-nav {
+                display: flex;
+                align-items: center;
+            }
+            .ft-sh-location { min-width: 0; gap: 8px; }
+            .ft-sh-location span {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .ft-sh-icon {
+                width: 17px;
+                height: 17px;
+                flex: 0 0 auto;
+            }
+            .ft-sh-utility { gap: 24px; }
+            .ft-sh-header a {
+                color: inherit;
+                text-decoration: none;
+            }
+            .ft-sh-utility a:hover,
+            .ft-sh-utility a:focus-visible { text-decoration: underline; }
+            .ft-sh-main { min-height: 72px; padding-block: 4px; }
+            .ft-sh-logo {
+                display: flex;
+                min-width: 0;
+                align-items: center;
+                color: var(--ft-sh-primary) !important;
+                font-size: 24px;
+                font-weight: 700;
+            }
+            .ft-sh-logo img {
+                display: block;
+                width: var(--ft-sh-logo-size);
+                max-width: 250px;
+                max-height: 64px;
+                height: auto;
+                object-fit: contain;
+            }
+            .ft-sh-nav { gap: 24px; }
+            .ft-sh-nav a {
+                color: var(--ft-sh-foreground);
+                font-size: 16px;
+                font-weight: 600;
+                white-space: nowrap;
+                transition: color .18s ease;
+            }
+            .ft-sh-nav a:hover,
+            .ft-sh-nav a:focus-visible,
+            .ft-sh-phone:hover,
+            .ft-sh-phone:focus-visible { color: var(--ft-sh-primary); }
+            .ft-sh-actions {
+                display: flex;
+                flex: 0 0 auto;
+                align-items: center;
+                gap: 16px;
+            }
+            .ft-sh-phone {
+                gap: 8px;
+                color: var(--ft-sh-foreground);
+                font-size: 16px;
+                font-weight: 700;
+                white-space: nowrap;
+            }
+            .ft-sh-phone .ft-sh-icon { color: var(--ft-sh-primary); }
+            .ft-sh-menu-toggle {
+                display: none;
+                width: 44px;
+                height: 44px;
+                padding: 0;
+                align-items: center;
+                justify-content: center;
+                border: 0;
+                border-radius: 6px;
+                background: transparent;
+                color: var(--ft-sh-foreground);
+                cursor: pointer;
+            }
+            .ft-sh-menu-toggle:hover,
+            .ft-sh-menu-toggle:focus-visible { background: #f3f5f7; }
+            .ft-sh-mobile-menu {
+                display: none;
+                padding: 8px 16px 18px;
+                border-top: 1px solid #e5e7eb;
+                background: #fff;
+            }
+            .ft-sh-mobile-menu[hidden] { display: none !important; }
+            .ft-sh-mobile-menu a {
+                display: block;
+                padding: 10px 0;
+                color: var(--ft-sh-foreground);
+                font-weight: 600;
+            }
+            .ft-sh-mobile-menu a:hover,
+            .ft-sh-mobile-menu a:focus-visible { color: var(--ft-sh-primary); }
+            .ft-sh-mobile-phone { border-top: 1px solid #e5e7eb; margin-top: 6px; }
+            @media (max-width: 1100px) {
+                .ft-sh-nav { display: none; }
+                .ft-sh-menu-toggle { display: inline-flex; }
+                .ft-sh-mobile-menu:not([hidden]) { display: block; }
+            }
+            @media (max-width: 782px) {
+                .admin-bar .ft-sh-header { top: 46px; }
+            }
+            @media (max-width: 640px) {
+                .ft-sh-inner { width: min(100% - 24px, 1340px); }
+                .ft-sh-utility,
+                .ft-sh-actions > .ft-sh-phone { display: none; }
+                .ft-sh-topbar { font-size: 12px; }
+                .ft-sh-main { min-height: 64px; }
+                .ft-sh-logo img { max-width: 180px; max-height: 56px; }
+            }
+        </style>
+        <script id="ft-header-shortcode-script">
+            document.addEventListener('click', function (event) {
+                var button = event.target.closest('.ft-sh-menu-toggle');
+                var link = event.target.closest('.ft-sh-mobile-menu a');
+
+                if (button) {
+                    var header = button.closest('.ft-sh-header');
+                    var menu = header ? header.querySelector('.ft-sh-mobile-menu') : null;
+                    if (!menu) return;
+                    var opening = menu.hasAttribute('hidden');
+                    menu.toggleAttribute('hidden', !opening);
+                    button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+                }
+
+                if (link) {
+                    var mobileMenu = link.closest('.ft-sh-mobile-menu');
+                    var mobileHeader = link.closest('.ft-sh-header');
+                    var toggle = mobileHeader ? mobileHeader.querySelector('.ft-sh-menu-toggle') : null;
+                    mobileMenu.setAttribute('hidden', '');
+                    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+        </script>
+        <?php
+    }
+    ?>
+    <header
+        class="ft-sh-header"
+        style="<?php echo esc_attr('--ft-sh-primary:' . $primary_color . ';--ft-sh-foreground:' . $foreground_color . ';--ft-sh-logo-size:' . $logo_size . ';'); ?>"
+    >
+        <div class="ft-sh-topbar">
+            <div class="ft-sh-inner ft-sh-topbar-inner">
+                <div class="ft-sh-location">
+                    <svg class="ft-sh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 10c0 5-5.5 10.2-7.4 11.8a1 1 0 0 1-1.2 0C9.5 20.2 4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <span><?php echo esc_html($service_area); ?></span>
+                </div>
+                <nav class="ft-sh-utility" aria-label="<?php esc_attr_e('Utility navigation', 'floors-today'); ?>">
+                    <a href="<?php echo esc_url(home_url('/financing/')); ?>">Financing</a>
+                    <a href="<?php echo esc_url(home_url('/contact/')); ?>">Contact</a>
+                    <a href="<?php echo esc_url(home_url('/faqs/')); ?>">FAQs</a>
+                </nav>
+            </div>
+        </div>
+        <div class="ft-sh-inner ft-sh-main">
+            <a class="ft-sh-logo" href="<?php echo esc_url(home_url('/')); ?>" aria-label="<?php echo esc_attr($logo_text); ?>">
+                <?php if ($logo_image !== '') : ?>
+                    <img src="<?php echo esc_url($logo_image); ?>" alt="<?php echo esc_attr($logo_text); ?>" loading="eager" decoding="async">
+                <?php else : ?>
+                    <span><?php echo esc_html($logo_text); ?></span>
+                <?php endif; ?>
+            </a>
+            <nav class="ft-sh-nav" aria-label="<?php esc_attr_e('Main navigation', 'floors-today'); ?>">
+                <?php foreach ($nav_items as $item) :
+                    $name = trim((string) ($item['name'] ?? ''));
+                    if ($name === '') {
+                        continue;
+                    }
+                    ?>
+                    <a href="<?php echo esc_url(ft_next_header_shortcode_url($item['href'] ?? '#')); ?>"><?php echo esc_html($name); ?></a>
+                <?php endforeach; ?>
+            </nav>
+            <div class="ft-sh-actions">
+                <?php if ($phone !== '' && $phone_href !== '') : ?>
+                    <a class="ft-sh-phone" href="<?php echo esc_url('tel:' . $phone_href); ?>">
+                        <svg class="ft-sh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M13.8 16.6a1 1 0 0 0 1.2-.3l.4-.5A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.5.4a1 1 0 0 0-.3 1.2 14 14 0 0 0 6.4 6.4Z"/></svg>
+                        <?php echo esc_html($phone); ?>
+                    </a>
+                <?php endif; ?>
+                <button class="ft-sh-menu-toggle" type="button" aria-expanded="false" aria-controls="<?php echo esc_attr($instance_id); ?>">
+                    <span class="screen-reader-text"><?php esc_html_e('Open menu', 'floors-today'); ?></span>
+                    <svg class="ft-sh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <nav id="<?php echo esc_attr($instance_id); ?>" class="ft-sh-mobile-menu" aria-label="<?php esc_attr_e('Mobile navigation', 'floors-today'); ?>" hidden>
+            <?php foreach ($nav_items as $item) :
+                $name = trim((string) ($item['name'] ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                ?>
+                <a href="<?php echo esc_url(ft_next_header_shortcode_url($item['href'] ?? '#')); ?>"><?php echo esc_html($name); ?></a>
+            <?php endforeach; ?>
+            <a href="<?php echo esc_url(home_url('/financing/')); ?>">Financing</a>
+            <a href="<?php echo esc_url(home_url('/contact/')); ?>">Contact</a>
+            <a href="<?php echo esc_url(home_url('/faqs/')); ?>">FAQs</a>
+            <?php if ($phone !== '' && $phone_href !== '') : ?>
+                <a class="ft-sh-mobile-phone" href="<?php echo esc_url('tel:' . $phone_href); ?>"><?php echo esc_html($phone); ?></a>
+            <?php endif; ?>
+        </nav>
+    </header>
+    <?php
+
+    return ob_get_clean();
+}
+
+add_shortcode('floors_header', 'ft_next_header_shortcode');
+
+function ft_next_footer_shortcode_links($value) {
+    $links = [];
+    $lines = preg_split('/\r\n|\r|\n/', (string) $value);
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+
+        if ($line === '') {
+            continue;
+        }
+
+        $parts = array_map('trim', explode('|', $line, 2));
+        $label = $parts[0] ?? '';
+        $url = $parts[1] ?? '#';
+
+        if ($label === '') {
+            continue;
+        }
+
+        $links[] = [
+            'label' => $label,
+            'url' => ft_next_header_shortcode_url($url),
+        ];
+    }
+
+    return $links;
+}
+
+function ft_next_footer_social_icon($label) {
+    $label = strtolower((string) $label);
+
+    $icons = [
+        'facebook' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 22v-9h3l.5-3.5h-3.5V7.3c0-1 .3-1.8 1.8-1.8H17V2.4c-.3 0-1.4-.1-2.7-.1-2.7 0-4.6 1.7-4.6 4.8v2.4H7V13h2.7v9h3.8Z"/></svg>',
+        'instagram' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7.2 2h9.6A5.2 5.2 0 0 1 22 7.2v9.6a5.2 5.2 0 0 1-5.2 5.2H7.2A5.2 5.2 0 0 1 2 16.8V7.2A5.2 5.2 0 0 1 7.2 2Zm-.2 2A3 3 0 0 0 4 7v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7Zm10.3 1.5a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>',
+        'linkedin' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5.3 7.8A2.3 2.3 0 1 1 5.3 3a2.3 2.3 0 0 1 0 4.7ZM3.3 9.5h4V21h-4V9.5Zm6.5 0h3.8v1.6h.1c.5-1 1.8-2.1 3.8-2.1 4 0 4.8 2.7 4.8 6.1V21h-4v-5.2c0-1.3 0-3-1.9-3s-2.1 1.4-2.1 2.9V21h-4V9.5Z"/></svg>',
+        'youtube' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23 7.1a3 3 0 0 0-2.1-2.2C19 4.4 12 4.4 12 4.4s-7 0-8.9.5A3 3 0 0 0 1 7.1 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.9 3 3 0 0 0 2.1 2.2c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.2 31 31 0 0 0 .5-4.9 31 31 0 0 0-.5-4.9ZM9.7 15.3V8.7L15.5 12l-5.8 3.3Z"/></svg>',
+        'tiktok' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.7 2c.3 2.2 1.6 3.6 3.8 3.8v3.7a9.2 9.2 0 0 1-3.8-1.1v7.1a6.6 6.6 0 1 1-5.7-6.6v3.8a2.9 2.9 0 1 0 2 2.8V2h3.7Z"/></svg>',
+    ];
+
+    return $icons[$label] ?? '<span aria-hidden="true">' . esc_html(strtoupper(substr($label, 0, 1))) . '</span>';
+}
+
+function ft_next_footer_shortcode() {
+    static $assets_printed = false;
+
+    $settings = ft_next_homepage_settings();
+
+    if (($settings['show_footer'] ?? '1') !== '1') {
+        return '';
+    }
+
+    $logo_text = (string) ($settings['logo_text'] ?? get_bloginfo('name'));
+    $logo_image = (string) ($settings['logo_image'] ?? '');
+    $footer_about = (string) ($settings['footer_about'] ?? '');
+    $service_area = (string) ($settings['service_area'] ?? '');
+    $phone = (string) ($settings['phone'] ?? '');
+    $phone_href = preg_replace('/[^0-9+]/', '', $phone);
+    $email = sanitize_email($settings['email'] ?? '');
+    $primary_color = (string) ($settings['primary_color'] ?? '#155f99');
+    $bg_color_1 = (string) ($settings['footer_bg_color_1'] ?? 'oklch(0.20 0.02 30)');
+    $bg_color_2 = (string) ($settings['footer_bg_color_2'] ?? 'oklch(0.20 0.02 30)');
+    $bg_location = (string) ($settings['footer_bg_location'] ?? 'to bottom');
+    $copyright = str_replace('{year}', (string) date_i18n('Y'), (string) ($settings['footer_copyright'] ?? ''));
+    $about_links = ft_next_footer_shortcode_links($settings['footer_about_links'] ?? '');
+    $help_links = ft_next_footer_shortcode_links($settings['footer_help_links'] ?? '');
+    $policy_links = ft_next_footer_shortcode_links($settings['footer_policy_links'] ?? '');
+    $categories = is_array($settings['categories'] ?? null) ? $settings['categories'] : [];
+    $social_links = [
+        'Facebook' => (string) ($settings['facebook_url'] ?? ''),
+        'Instagram' => (string) ($settings['instagram_url'] ?? ''),
+        'LinkedIn' => (string) ($settings['linkedin_url'] ?? ''),
+        'YouTube' => (string) ($settings['youtube_url'] ?? ''),
+        'TikTok' => (string) ($settings['tiktok_url'] ?? ''),
+    ];
+
+    ob_start();
+
+    if (!$assets_printed) {
+        $assets_printed = true;
+        ?>
+        <style id="ft-footer-shortcode-styles">
+            .ft-sh-footer,
+            .ft-sh-footer * { box-sizing: border-box; }
+            .ft-sh-footer {
+                width: 100%;
+                background: linear-gradient(var(--ft-sh-footer-bg-location), var(--ft-sh-footer-bg-1), var(--ft-sh-footer-bg-2));
+                color: #fff;
+                font-family: inherit;
+            }
+            .ft-sh-footer a {
+                color: inherit;
+                text-decoration: none;
+            }
+            .ft-sh-footer a:hover,
+            .ft-sh-footer a:focus-visible {
+                color: #fff;
+                text-decoration: underline;
+            }
+            .ft-sh-footer-inner {
+                width: min(100% - 32px, 1340px);
+                margin-inline: auto;
+            }
+            .ft-sh-footer-top {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 24px;
+                padding: 32px 0;
+                border-bottom: 1px solid rgba(255, 255, 255, .12);
+            }
+            .ft-sh-footer-brand {
+                max-width: 520px;
+            }
+            .ft-sh-footer-logo {
+                display: inline-flex;
+                align-items: center;
+                color: #fff;
+                font-size: 26px;
+                font-weight: 800;
+            }
+            .ft-sh-footer-logo img {
+                display: block;
+                width: 300px;
+                max-width: 100%;
+                max-height: 92px;
+                height: auto;
+                object-fit: contain;
+            }
+            .ft-sh-footer-about {
+                margin: 20px 0 0;
+                color: rgba(255, 255, 255, .72);
+                font-size: 14px;
+                line-height: 1.65;
+            }
+            .ft-sh-footer-newsletter {
+                width: auto;
+            }
+            .ft-sh-footer-newsletter h3 {
+                margin: 0;
+                color: #fff;
+                font-size: 18px;
+                line-height: 1.2;
+                font-weight: 700;
+            }
+            .ft-sh-footer-newsletter p {
+                margin: 6px 0 0;
+                color: rgba(255, 255, 255, .72);
+                font-size: 15px;
+            }
+            .ft-sh-footer-form {
+                display: flex;
+                gap: 10px;
+                width: min(100%, 356px);
+            }
+            .ft-sh-footer-form input {
+                min-width: 0;
+                width: 256px;
+                height: 32px;
+                border: 1px solid rgba(255, 255, 255, .16);
+                border-radius: 8px;
+                background: rgba(255, 255, 255, .08);
+                color: #fff;
+                padding: 0 10px;
+                font: inherit;
+                font-size: 14px;
+            }
+            .ft-sh-footer-form input::placeholder { color: rgba(255, 255, 255, .55); }
+            .ft-sh-footer-form button {
+                min-height: 32px;
+                padding: 0 12px;
+                border: 0;
+                border-radius: 8px;
+                background: var(--ft-sh-footer-secondary);
+                color: #fff;
+                font: inherit;
+                font-size: 14px;
+                font-weight: 700;
+                cursor: pointer;
+                white-space: nowrap;
+            }
+            .ft-sh-footer-grid {
+                display: grid;
+                grid-template-columns: minmax(180px, 1.1fr) repeat(4, minmax(150px, 1fr));
+                gap: 30px;
+                padding: 48px 0 38px;
+            }
+            .ft-sh-footer-col h4 {
+                margin: 0 0 16px;
+                color: #fff;
+                font-size: 16px;
+                font-weight: 800;
+            }
+            .ft-sh-footer-list {
+                display: grid;
+                gap: 11px;
+                margin: 0;
+                padding: 0;
+                list-style: none;
+            }
+            .ft-sh-footer-list a,
+            .ft-sh-footer-contact {
+                color: rgba(255, 255, 255, .72);
+                font-size: 14px;
+                line-height: 1.45;
+            }
+            .ft-sh-footer-contact {
+                display: grid;
+                gap: 12px;
+            }
+            .ft-sh-footer-contact a,
+            .ft-sh-footer-contact span {
+                color: rgba(255, 255, 255, .72);
+                overflow-wrap: anywhere;
+            }
+            .ft-sh-footer-social {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-top: 24px;
+            }
+            .ft-sh-footer-social a {
+                display: inline-flex;
+                width: 32px;
+                height: 32px;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid rgba(255, 255, 255, .25);
+                border-radius: 50%;
+                background: rgba(255, 255, 255, .10);
+                color: #fff;
+                font-weight: 800;
+                text-decoration: none;
+            }
+            .ft-sh-footer-social a:hover,
+            .ft-sh-footer-social a:focus-visible {
+                border-color: var(--ft-sh-footer-secondary);
+                background: var(--ft-sh-footer-secondary);
+                color: #fff;
+            }
+            .ft-sh-footer-social svg {
+                width: 16px;
+                height: 16px;
+            }
+            .ft-sh-footer-bottom {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 24px;
+                padding: 24px 0;
+                border-top: 1px solid rgba(255, 255, 255, .12);
+                color: rgba(255, 255, 255, .66);
+                font-size: 14px;
+            }
+            .ft-sh-footer-bottom p { margin: 0; }
+            .ft-sh-footer-bottom-contact {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 24px;
+            }
+            .ft-sh-footer-bottom-contact a,
+            .ft-sh-footer-bottom-contact span {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                color: rgba(255, 255, 255, .66);
+            }
+            .ft-sh-footer-bottom-icon {
+                width: 16px;
+                height: 16px;
+                flex: 0 0 auto;
+            }
+            @media (max-width: 1024px) {
+                .ft-sh-footer-top {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+                .ft-sh-footer-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+            }
+            @media (max-width: 640px) {
+                .ft-sh-footer-inner { width: min(100% - 24px, 1340px); }
+                .ft-sh-footer-grid {
+                    grid-template-columns: 1fr;
+                    gap: 26px;
+                }
+                .ft-sh-footer-form { flex-direction: column; }
+                .ft-sh-footer-form,
+                .ft-sh-footer-form input { width: 100%; }
+                .ft-sh-footer-bottom {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+                .ft-sh-footer-logo img {
+                    max-width: 210px;
+                }
+            }
+        </style>
+        <script id="ft-footer-shortcode-script">
+            document.addEventListener('submit', function (event) {
+                var form = event.target.closest('.ft-sh-footer-form');
+                if (!form) return;
+                event.preventDefault();
+                var input = form.querySelector('input[type="email"]');
+                if (input && input.reportValidity()) input.value = '';
+            });
+        </script>
+        <?php
+    }
+    ?>
+    <footer
+        class="ft-sh-footer"
+        style="<?php echo esc_attr('--ft-sh-footer-primary:' . $primary_color . ';--ft-sh-footer-secondary:' . ($settings['secondary_color'] ?? '#cc9c2e') . ';--ft-sh-footer-bg-1:' . $bg_color_1 . ';--ft-sh-footer-bg-2:' . $bg_color_2 . ';--ft-sh-footer-bg-location:' . $bg_location . ';'); ?>"
+    >
+        <div class="ft-sh-footer-inner">
+            <div class="ft-sh-footer-top">
+                <div class="ft-sh-footer-newsletter">
+                    <h3><?php echo esc_html($settings['newsletter_title'] ?? 'Subscribe to Newsletter'); ?></h3>
+                    <p><?php echo esc_html($settings['newsletter_text'] ?? 'Get the latest deals and flooring tips'); ?></p>
+                </div>
+                <div class="ft-sh-footer-newsletter-form">
+                    <form class="ft-sh-footer-form">
+                        <label class="screen-reader-text" for="ft-footer-newsletter-email"><?php esc_html_e('Email address', 'floors-today'); ?></label>
+                        <input id="ft-footer-newsletter-email" type="email" placeholder="<?php esc_attr_e('Your Email', 'floors-today'); ?>" required>
+                        <button type="submit"><?php echo esc_html($settings['newsletter_button'] ?? 'Subscribe'); ?></button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="ft-sh-footer-grid">
+                <div class="ft-sh-footer-brand">
+                    <a class="ft-sh-footer-logo" href="<?php echo esc_url(home_url('/')); ?>" aria-label="<?php echo esc_attr($logo_text); ?>">
+                        <?php if ($logo_image !== '') : ?>
+                            <img src="<?php echo esc_url($logo_image); ?>" alt="<?php echo esc_attr($logo_text); ?>" loading="lazy" decoding="async">
+                        <?php else : ?>
+                            <span><?php echo esc_html($logo_text); ?></span>
+                        <?php endif; ?>
+                    </a>
+                    <?php if ($footer_about !== '') : ?>
+                        <p class="ft-sh-footer-about"><?php echo esc_html($footer_about); ?></p>
+                    <?php endif; ?>
+                    <div class="ft-sh-footer-social" aria-label="<?php esc_attr_e('Social links', 'floors-today'); ?>">
+                        <?php foreach ($social_links as $label => $url) :
+                            $url = trim($url);
+                            if ($url === '') {
+                                continue;
+                            }
+                            ?>
+                            <a href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener" aria-label="<?php echo esc_attr($label); ?>"><?php echo ft_next_footer_social_icon($label); ?></a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="ft-sh-footer-col">
+                    <h4><?php echo esc_html($settings['footer_about_title'] ?? 'About Us'); ?></h4>
+                    <ul class="ft-sh-footer-list">
+                        <?php foreach ($about_links as $link) : ?>
+                            <li><a href="<?php echo esc_url($link['url']); ?>"><?php echo esc_html($link['label']); ?></a></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <div class="ft-sh-footer-col">
+                    <h4><?php echo esc_html($settings['footer_categories_title'] ?? 'Categories'); ?></h4>
+                    <ul class="ft-sh-footer-list">
+                        <?php foreach ($categories as $category) :
+                            $name = trim((string) ($category['name'] ?? ''));
+                            $slug = trim((string) ($category['slug'] ?? ''));
+                            if ($name === '') {
+                                continue;
+                            }
+                            $url = $slug !== '' ? home_url('/product-category/' . sanitize_title($slug) . '/') : '#';
+                            ?>
+                            <li><a href="<?php echo esc_url($url); ?>"><?php echo esc_html($name); ?></a></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <div class="ft-sh-footer-col">
+                    <h4><?php echo esc_html($settings['footer_help_title'] ?? 'Help Area'); ?></h4>
+                    <ul class="ft-sh-footer-list">
+                        <?php foreach ($help_links as $link) : ?>
+                            <li><a href="<?php echo esc_url($link['url']); ?>"><?php echo esc_html($link['label']); ?></a></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <div class="ft-sh-footer-col">
+                    <h4><?php echo esc_html($settings['footer_policies_title'] ?? 'Our Policies'); ?></h4>
+                    <ul class="ft-sh-footer-list">
+                        <?php foreach ($policy_links as $link) : ?>
+                            <li><a href="<?php echo esc_url($link['url']); ?>"><?php echo esc_html($link['label']); ?></a></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="ft-sh-footer-bottom">
+                <div class="ft-sh-footer-bottom-contact">
+                    <?php if ($service_area !== '') : ?>
+                        <span><svg class="ft-sh-footer-bottom-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 10c0 5-5.5 10.2-7.4 11.8a1 1 0 0 1-1.2 0C9.5 20.2 4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><?php echo esc_html($service_area); ?></span>
+                    <?php endif; ?>
+                    <?php if ($phone !== '' && $phone_href !== '') : ?>
+                        <a href="<?php echo esc_url('tel:' . $phone_href); ?>"><svg class="ft-sh-footer-bottom-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M13.8 16.6a1 1 0 0 0 1.2-.3l.4-.5A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.5.4a1 1 0 0 0-.3 1.2 14 14 0 0 0 6.4 6.4Z"/></svg><?php echo esc_html($phone); ?></a>
+                    <?php endif; ?>
+                    <?php if ($email !== '') : ?>
+                        <a href="<?php echo esc_url('mailto:' . $email); ?>"><svg class="ft-sh-footer-bottom-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m22 7-9 5.7a2 2 0 0 1-2 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg><?php echo esc_html($email); ?></a>
+                    <?php endif; ?>
+                </div>
+                <p><?php echo esc_html($copyright); ?></p>
+            </div>
+        </div>
+    </footer>
+    <?php
+
+    return ob_get_clean();
+}
+
+add_shortcode('floors_footer', 'ft_next_footer_shortcode');
+
+function ft_next_booking_form_shortcode() {
+    static $styles_printed = false;
+
+    $settings = ft_next_homepage_settings();
+    $instance_id = wp_unique_id('ft-booking-form-');
+    $endpoint = rest_url('floors-today/v1/inbox-leads');
+    $primary_color = sanitize_hex_color($settings['primary_color'] ?? '') ?: '#155f99';
+    $secondary_color = sanitize_hex_color($settings['secondary_color'] ?? '') ?: '#cc9c2e';
+    $title = (string) ($settings['form_title'] ?? 'Get Your FREE In-Home Estimate');
+    $subtitle = (string) ($settings['form_subtitle'] ?? 'No obligation. Takes just 2 minutes.');
+    $flooring_types = ['Solid Hardwood', 'Engineered Hardwood', 'Laminate', 'Vinyl', 'Carpet', 'Not sure yet'];
+    $property_types = ['Residential', 'Office Space', 'Business'];
+    $start_times = ['Within 1 month', '1-3 months', '3+ months', 'Just researching'];
+
+    ob_start();
+
+    if (!$styles_printed) {
+        $styles_printed = true;
+        ?>
+        <style id="ft-booking-form-shortcode-styles">
+            .ft-bf,
+            .ft-bf * { box-sizing: border-box; }
+            .ft-bf button,
+            .ft-bf input,
+            .ft-bf select {
+                font-family: inherit;
+            }
+            .ft-bf button {
+                appearance: none;
+                -webkit-appearance: none;
+                text-transform: none;
+                letter-spacing: 0;
+                box-shadow: none;
+            }
+            .ft-bf {
+                width: 100%;
+                max-width: none;
+                margin-inline: 0;
+                padding: clamp(20px, 5vw, 36px);
+                overflow: hidden;
+                border: 1px solid rgba(255, 255, 255, .5);
+                border-radius: 20px;
+                background: #fff;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .25);
+                color: #0f172a;
+                font-family: inherit;
+                font-size: 14px;
+            }
+            .ft-bf__heading { margin-bottom: 0; text-align: center; }
+            .ft-bf__title { margin: 0; color: #020617; font-family: Georgia, "Times New Roman", serif; font-size: clamp(24px, 4vw, 30px); font-weight: 700; line-height: 1.2; }
+            .ft-bf__subtitle { margin: 8px 0 0; color: #475569; font-size: 14px; }
+            .ft-bf__progress {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 28px 0;
+            }
+            .ft-bf__dot {
+                display: inline-flex;
+                width: 36px;
+                height: 36px;
+                flex: 0 0 36px;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                background: #f5f5f4;
+                color: #78716c;
+                font-size: 14px;
+                font-weight: 700;
+                transition: background-color .18s ease, color .18s ease;
+            }
+            .ft-bf__dot.is-active { background: var(--ft-bf-primary); color: #fff; }
+            .ft-bf__dot.is-complete { background: #059669; color: #fff; }
+            .ft-bf__line { width: clamp(32px, 10vw, 56px); height: 2px; margin: 0 10px; border-radius: 999px; background: #f5f5f4; transition: background-color .18s ease; }
+            .ft-bf__line.is-complete { background: #059669; }
+            .ft-bf__step[hidden] { display: none !important; }
+            .ft-bf__step { animation: ft-bf-fade .22s ease both; }
+            @keyframes ft-bf-fade {
+                from { opacity: 0; transform: translateY(4px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .ft-bf__question { margin: 0 0 16px; color: #0f172a; font-size: 16px; font-weight: 700; }
+            .ft-bf__choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+            .ft-bf button.ft-bf__choice {
+                min-height: 54px;
+                padding: 12px 16px;
+                border: 1px solid #e7e5e4 !important;
+                border-radius: 8px !important;
+                background: #fff !important;
+                color: #0f172a !important;
+                font: inherit;
+                font-weight: 600;
+                text-align: left;
+                cursor: pointer;
+                transition: border-color .18s ease, background-color .18s ease, color .18s ease, transform .12s ease;
+            }
+            .ft-bf button.ft-bf__choice:hover,
+            .ft-bf button.ft-bf__choice:focus-visible { border-color: var(--ft-bf-primary) !important; outline: none; }
+            .ft-bf button.ft-bf__choice:active { transform: translateY(1px); }
+            .ft-bf button.ft-bf__choice.is-selected {
+                border-color: var(--ft-bf-primary) !important;
+                background: color-mix(in srgb, var(--ft-bf-primary) 7%, white) !important;
+                color: var(--ft-bf-primary) !important;
+            }
+            .ft-bf__property { min-height: 96px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #475569; }
+            .ft-bf button.ft-bf__property.is-selected { color: #0f172a !important; background: color-mix(in srgb, var(--ft-bf-secondary) 10%, white) !important; border-color: var(--ft-bf-secondary) !important; }
+            .ft-bf__property svg { width: 24px; height: 24px; }
+            .ft-bf__field { display: block; margin: 0 0 16px; }
+            .ft-bf__field > span { display: block; margin-bottom: 7px; color: #475569; font-size: 14px; font-weight: 600; }
+            .ft-bf__input,
+            .ft-bf__select {
+                display: block;
+                width: 100%;
+                height: 48px;
+                padding: 0 14px;
+                border: 1px solid #d6d3d1;
+                border-radius: 8px;
+                background: #fff;
+                color: #0f172a;
+                font: inherit;
+                font-size: 16px;
+                transition: border-color .18s ease, box-shadow .18s ease;
+            }
+            .ft-bf__input:focus,
+            .ft-bf__select:focus { border-color: var(--ft-bf-primary); outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ft-bf-primary) 18%, transparent); }
+            .ft-bf__columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+            .ft-bf__actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; }
+            .ft-bf button.ft-bf__next,
+            .ft-bf button.ft-bf__submit {
+                display: inline-flex;
+                min-height: 40px;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                padding: 8px 20px;
+                border: 0 !important;
+                border-radius: 999px !important;
+                background: var(--ft-bf-primary) !important;
+                color: #fff !important;
+                font: inherit;
+                font-weight: 700;
+                cursor: pointer;
+                white-space: nowrap;
+                text-decoration: none !important;
+                transition: background-color .18s ease, box-shadow .18s ease, transform .12s ease, opacity .18s ease;
+            }
+            .ft-bf button.ft-bf__next:hover,
+            .ft-bf button.ft-bf__submit:hover {
+                background: color-mix(in srgb, var(--ft-bf-primary) 90%, white) !important;
+                color: #fff !important;
+                box-shadow: 0 10px 20px rgba(35, 91, 184, .18) !important;
+            }
+            .ft-bf button.ft-bf__next:focus-visible,
+            .ft-bf button.ft-bf__submit:focus-visible {
+                outline: 0;
+                box-shadow: 0 0 0 3px color-mix(in srgb, var(--ft-bf-primary) 24%, transparent);
+            }
+            .ft-bf button.ft-bf__next:active,
+            .ft-bf button.ft-bf__submit:active { transform: translateY(1px); }
+            .ft-bf button.ft-bf__submit:disabled { cursor: wait; opacity: .65; animation: ft-bf-pulse 1.1s ease-in-out infinite; }
+            .ft-bf__arrow {
+                display: inline-block;
+                line-height: 1;
+                transition: transform .18s ease;
+            }
+            .ft-bf button.ft-bf__next:hover .ft-bf__arrow,
+            .ft-bf button.ft-bf__next:focus-visible .ft-bf__arrow,
+            .ft-bf button.ft-bf__submit:hover .ft-bf__arrow,
+            .ft-bf button.ft-bf__submit:focus-visible .ft-bf__arrow {
+                transform: translateX(4px);
+            }
+            @keyframes ft-bf-pulse {
+                0%, 100% { opacity: .65; }
+                50% { opacity: .88; }
+            }
+            .ft-bf button.ft-bf__back {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 2px;
+                border: 0 !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+                color: #64748b !important;
+                font: inherit;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: none !important;
+                transition: color .18s ease;
+            }
+            .ft-bf button.ft-bf__back:hover,
+            .ft-bf button.ft-bf__back:focus-visible { color: #020617 !important; background: transparent !important; outline: none; }
+            .ft-bf__error { margin: 14px 0 0; color: #dc2626; font-size: 14px; font-weight: 600; }
+            .ft-bf__success { min-height: 360px; text-align: center; align-content: center; animation: ft-bf-fade .22s ease both; }
+            .ft-bf__success-icon {
+                display: inline-flex;
+                width: 64px;
+                height: 64px;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                background: #ecfdf5;
+                color: #047857;
+                font-size: 32px;
+                font-weight: 700;
+            }
+            .ft-bf__success h3 { margin: 18px 0 8px; color: #0f172a; font-size: 24px; }
+            .ft-bf__success p { margin: 0; color: #475569; }
+            .ft-bf__trap { position: absolute !important; left: -10000px !important; width: 1px !important; height: 1px !important; overflow: hidden !important; }
+            @media (max-width: 520px) {
+                .ft-bf__choices,
+                .ft-bf__columns { grid-template-columns: 1fr; }
+                .ft-bf__property { min-height: 54px; text-align: left; }
+            }
+        </style>
+        <?php
+    }
+    ?>
+    <div
+        id="<?php echo esc_attr($instance_id); ?>"
+        class="ft-bf"
+        data-endpoint="<?php echo esc_url($endpoint); ?>"
+        style="<?php echo esc_attr('--ft-bf-primary:' . $primary_color . ';--ft-bf-secondary:' . $secondary_color . ';'); ?>"
+    >
+        <div class="ft-bf__heading">
+            <h2 class="ft-bf__title"><?php echo esc_html($title); ?></h2>
+            <p class="ft-bf__subtitle"><?php echo esc_html($subtitle); ?></p>
+        </div>
+        <div class="ft-bf__progress" aria-label="<?php esc_attr_e('Booking form progress', 'floors-today'); ?>">
+            <span class="ft-bf__dot is-active" data-dot="1">1</span><span class="ft-bf__line" data-line="1"></span>
+            <span class="ft-bf__dot" data-dot="2">2</span><span class="ft-bf__line" data-line="2"></span>
+            <span class="ft-bf__dot" data-dot="3">3</span>
+        </div>
+        <form class="ft-bf__form">
+            <div class="ft-bf__trap" aria-hidden="true">
+                <label>Leave this field empty<input name="ftInboxTrap" type="text" tabindex="-1" autocomplete="new-password"></label>
+            </div>
+            <section class="ft-bf__step" data-step="1">
+                <h3 class="ft-bf__question">What floors interest you?</h3>
+                <div class="ft-bf__choices">
+                    <?php foreach ($flooring_types as $flooring_type) : ?>
+                        <button class="ft-bf__choice" type="button" data-field="flooringType" data-value="<?php echo esc_attr($flooring_type); ?>"><?php echo esc_html($flooring_type); ?></button>
+                    <?php endforeach; ?>
+                </div>
+                <div class="ft-bf__actions"><span></span><button class="ft-bf__next" type="button">Continue <span class="ft-bf__arrow" aria-hidden="true">&rarr;</span></button></div>
+            </section>
+            <section class="ft-bf__step" data-step="2" hidden>
+                <h3 class="ft-bf__question">Property type</h3>
+                <div class="ft-bf__choices">
+                    <?php foreach ($property_types as $property_type) : ?>
+                        <button class="ft-bf__choice ft-bf__property" type="button" data-field="propertyType" data-value="<?php echo esc_attr($property_type); ?>"><?php echo esc_html($property_type); ?></button>
+                    <?php endforeach; ?>
+                </div>
+                <label class="ft-bf__field" style="margin-top:20px">
+                    <span>When are you looking to start?</span>
+                    <select class="ft-bf__select" name="startTime">
+                        <?php foreach ($start_times as $start_time) : ?>
+                            <option value="<?php echo esc_attr($start_time); ?>"><?php echo esc_html($start_time); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <div class="ft-bf__actions"><button class="ft-bf__back" type="button">&larr; Back</button><button class="ft-bf__next" type="button">Continue <span class="ft-bf__arrow" aria-hidden="true">&rarr;</span></button></div>
+            </section>
+            <section class="ft-bf__step" data-step="3" hidden>
+                <h3 class="ft-bf__question">Where should we visit?</h3>
+                <label class="ft-bf__field"><span>Full name</span><input class="ft-bf__input" name="fullName" type="text" autocomplete="name" placeholder="Jane Doe" required></label>
+                <label class="ft-bf__field"><span>Email</span><input class="ft-bf__input" name="email" type="email" autocomplete="email" placeholder="jane@email.com" required></label>
+                <div class="ft-bf__columns">
+                    <label class="ft-bf__field"><span>Phone</span><input class="ft-bf__input" name="phone" type="tel" autocomplete="tel" value="+1 " required></label>
+                    <label class="ft-bf__field"><span>Postal code</span><input class="ft-bf__input" name="postalCode" type="text" autocomplete="postal-code" placeholder="M5V 2T6" required></label>
+                </div>
+                <div class="ft-bf__actions"><button class="ft-bf__back" type="button">&larr; Back</button><button class="ft-bf__submit" type="submit">Get My Free Estimate <span class="ft-bf__arrow" aria-hidden="true">&rarr;</span></button></div>
+            </section>
+            <p class="ft-bf__error" role="alert" hidden></p>
+        </form>
+        <div class="ft-bf__success" hidden>
+            <span class="ft-bf__success-icon" aria-hidden="true">&check;</span>
+            <h3>Request received</h3>
+            <p>A Floors Today specialist will contact you shortly.</p>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var root = document.getElementById(<?php echo wp_json_encode($instance_id); ?>);
+            if (!root || root.dataset.ready === '1') return;
+            root.dataset.ready = '1';
+
+            var form = root.querySelector('.ft-bf__form');
+            var error = root.querySelector('.ft-bf__error');
+            var state = { step: 1, flooringType: '', propertyType: '' };
+
+            function showError(message) {
+                error.textContent = message || '';
+                error.hidden = !message;
+            }
+
+            function showStep(step) {
+                state.step = step;
+                root.querySelectorAll('[data-step]').forEach(function (panel) {
+                    panel.hidden = Number(panel.dataset.step) !== step;
+                });
+                root.querySelectorAll('[data-dot]').forEach(function (dot) {
+                    var number = Number(dot.dataset.dot);
+                    dot.classList.toggle('is-active', number === step);
+                    dot.classList.toggle('is-complete', number < step);
+                    dot.textContent = number < step ? '\u2713' : String(number);
+                });
+                root.querySelectorAll('[data-line]').forEach(function (line) {
+                    line.classList.toggle('is-complete', Number(line.dataset.line) < step);
+                });
+                showError('');
+            }
+
+            root.addEventListener('click', function (event) {
+                var choice = event.target.closest('.ft-bf__choice');
+                var next = event.target.closest('.ft-bf__next');
+                var back = event.target.closest('.ft-bf__back');
+
+                if (choice) {
+                    state[choice.dataset.field] = choice.dataset.value;
+                    root.querySelectorAll('[data-field="' + choice.dataset.field + '"]').forEach(function (item) {
+                        item.classList.toggle('is-selected', item === choice);
+                    });
+                }
+
+                if (next) {
+                    if (state.step === 1 && !state.flooringType) return showError('Please choose a flooring option.');
+                    if (state.step === 2 && !state.propertyType) return showError('Please choose a property type.');
+                    showStep(Math.min(3, state.step + 1));
+                }
+
+                if (back) showStep(Math.max(1, state.step - 1));
+            });
+
+            form.addEventListener('submit', async function (event) {
+                event.preventDefault();
+                showError('');
+
+                if (!form.reportValidity()) return;
+
+                var data = new FormData(form);
+                var fullName = String(data.get('fullName') || '').trim();
+                if (fullName.split(/\s+/).filter(Boolean).length < 2) {
+                    return showError('Please enter your first and last name.');
+                }
+
+                var submit = root.querySelector('.ft-bf__submit');
+                submit.disabled = true;
+                    submit.textContent = 'Sending...';
+
+                try {
+                    var pageUrl = new URL(window.location.href);
+                    var referrer = document.referrer || '';
+                    var referrerHost = referrer ? new URL(referrer).hostname.replace(/^www\./, '') : '';
+                    var utmSource = pageUrl.searchParams.get('utm_source') || '';
+                    var response = await fetch(root.dataset.endpoint, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            fullName: fullName,
+                            email: data.get('email'),
+                            phone: data.get('phone'),
+                            postalCode: data.get('postalCode'),
+                            flooringType: state.flooringType,
+                            propertyType: state.propertyType,
+                            startTime: data.get('startTime'),
+                            ftInboxTrap: data.get('ftInboxTrap'),
+                            source: 'WordPress booking form shortcode',
+                            pageUrl: window.location.href,
+                            trafficSource: utmSource || referrerHost || 'Direct',
+                            referrerUrl: referrer,
+                            utmSource: utmSource,
+                            utmMedium: pageUrl.searchParams.get('utm_medium') || '',
+                            utmCampaign: pageUrl.searchParams.get('utm_campaign') || '',
+                            utmContent: pageUrl.searchParams.get('utm_content') || '',
+                            utmTerm: pageUrl.searchParams.get('utm_term') || '',
+                            devicePlatform: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Mobile / Tablet' : 'Desktop'
+                        })
+                    });
+                    var result = await response.json().catch(function () { return null; });
+                    if (!response.ok) throw new Error(result && result.message ? result.message : 'We could not send your request.');
+
+                    form.hidden = true;
+                    root.querySelector('.ft-bf__progress').hidden = true;
+                    root.querySelector('.ft-bf__success').hidden = false;
+                } catch (requestError) {
+                    showError(requestError.message || 'We could not send your request. Please try again.');
+                    submit.disabled = false;
+                    submit.innerHTML = 'Get My Free Estimate <span class="ft-bf__arrow" aria-hidden="true">&rarr;</span>';
+                }
+            });
+        }());
+    </script>
+    <?php
+
+    return ob_get_clean();
+}
+
+add_shortcode('floors_booking_form', 'ft_next_booking_form_shortcode');
+
 add_action('rest_api_init', function () {
     register_rest_route('floors-today/v1', '/homepage', [
         'methods' => 'GET',
