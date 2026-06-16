@@ -54,6 +54,7 @@ function ft_next_homepage_defaults() {
         'hero_badge_bg_color' => 'lab(76 3.16 65.32)',
         'hero_badge_text_color' => '#ffffff',
         'hero_badge_font_size' => '16px',
+        'hero_badge_mobile_font_size' => '14px',
         'hero_badge_padding_x' => '16px',
         'hero_badge_padding_y' => '8px',
         'hero_title' => 'Transform Your Home with',
@@ -205,15 +206,10 @@ function ft_next_homepage_defaults() {
 function ft_next_homepage_settings() {
     $saved = get_option(FT_NEXT_HOME_OPTION, []);
     $settings = array_replace_recursive(ft_next_homepage_defaults(), is_array($saved) ? $saved : []);
-    $public_path = trailingslashit((string) wp_parse_url(ft_next_homepage_asset_url(), PHP_URL_PATH));
 
-    array_walk_recursive($settings, function (&$value) use ($public_path) {
+    array_walk_recursive($settings, function (&$value) {
         if (is_string($value)) {
-            $value = str_replace(
-                ['/floorstest/', '/floorstoday/public/'],
-                $public_path,
-                $value
-            );
+            $value = ft_next_homepage_normalize_saved_url($value);
         }
     });
 
@@ -226,6 +222,252 @@ function ft_next_homepage_frontend_url() {
 
 function ft_next_homepage_asset_url() {
     return home_url('/public/');
+}
+
+function ft_next_homepage_css_length($value, $fallback) {
+    $value = trim((string) $value);
+
+    if (preg_match('/^\d+(?:\.\d+)?(?:px|rem|em|%)$/', $value)) {
+        return $value;
+    }
+
+    return $fallback;
+}
+
+function ft_next_homepage_category_slugs() {
+    return [
+        'solid-hardwood',
+        'engineered-hardwood',
+        'laminate',
+        'vinyl',
+        'carpet',
+    ];
+}
+
+function ft_next_homepage_category_url($slug) {
+    $slug = sanitize_title((string) $slug);
+
+    if ($slug === '' || !in_array($slug, ft_next_homepage_category_slugs(), true)) {
+        return '';
+    }
+
+    return home_url('/categories/' . $slug . '/');
+}
+
+function ft_next_homepage_normalize_category_urls($value) {
+    if (!is_string($value) || $value === '') {
+        return $value;
+    }
+
+    foreach (ft_next_homepage_category_slugs() as $slug) {
+        $placeholder = '%%FT_NEXT_CATEGORY_' . strtoupper(str_replace('-', '_', $slug)) . '%%';
+        $category_url = ft_next_homepage_category_url($slug);
+
+        $value = str_replace(
+            [
+                'http://localhost/floorstodaystore/a/product-category/' . $slug . '/',
+                'https://localhost/floorstodaystore/a/product-category/' . $slug . '/',
+                'http://localhost/floorstodayhome/a/product-category/' . $slug . '/',
+                'https://localhost/floorstodayhome/a/product-category/' . $slug . '/',
+                'https://floorstoday.ca/a/product-category/' . $slug . '/',
+                'https://staging.floorstoday.ca/a/product-category/' . $slug . '/',
+                'http://localhost/floorstodaystore/product-category/' . $slug . '/',
+                'https://localhost/floorstodaystore/product-category/' . $slug . '/',
+                'http://localhost/floorstodayhome/product-category/' . $slug . '/',
+                'https://localhost/floorstodayhome/product-category/' . $slug . '/',
+                'https://floorstoday.ca/product-category/' . $slug . '/',
+                'https://staging.floorstoday.ca/product-category/' . $slug . '/',
+                '/a/product-category/' . $slug . '/',
+                '/product-category/' . $slug . '/',
+            ],
+            $placeholder,
+            $value
+        );
+
+        $value = str_replace($placeholder, $category_url, $value);
+    }
+
+    return $value;
+}
+
+function ft_next_homepage_normalize_saved_url($value) {
+    if (!is_string($value) || $value === '') {
+        return $value;
+    }
+
+    $uploads_url = trailingslashit(content_url('uploads'));
+    $public_url = trailingslashit(ft_next_homepage_asset_url());
+    $home_url = trailingslashit(home_url());
+
+    $replacements = [
+        'http://localhost/floorstodaystore/wp-content/uploads/' => $uploads_url,
+        'https://localhost/floorstodaystore/wp-content/uploads/' => $uploads_url,
+        'http://localhost/floorstodayhome/wp-content/uploads/' => $uploads_url,
+        'https://localhost/floorstodayhome/wp-content/uploads/' => $uploads_url,
+        'https://floorstoday.ca/floorstodaystore/wp-content/uploads/' => $uploads_url,
+        'https://staging.floorstoday.ca/floorstodaystore/wp-content/uploads/' => $uploads_url,
+        '/floorstodaystore/wp-content/uploads/' => $uploads_url,
+        '/floorstodayhome/wp-content/uploads/' => $uploads_url,
+
+        'http://localhost/floorstodaystore/public/' => $public_url,
+        'https://localhost/floorstodaystore/public/' => $public_url,
+        'http://localhost/floorstodayhome/public/' => $public_url,
+        'https://localhost/floorstodayhome/public/' => $public_url,
+        'https://floorstoday.ca/floorstodaystore/public/' => $public_url,
+        'https://staging.floorstoday.ca/floorstodaystore/public/' => $public_url,
+        '/floorstodaystore/public/' => $public_url,
+        '/floorstodayhome/public/' => $public_url,
+        '/floorstoday/public/' => $public_url,
+        '/floorstest/' => $public_url,
+
+        'http://localhost/floorstodaystore/' => $home_url,
+        'https://localhost/floorstodaystore/' => $home_url,
+        'http://localhost/floorstodayhome/' => $home_url,
+        'https://localhost/floorstodayhome/' => $home_url,
+    ];
+
+    foreach ($replacements as $search => $replace) {
+        if (substr($value, 0, strlen($search)) === $search) {
+            return ft_next_homepage_normalize_category_urls($replace . substr($value, strlen($search)));
+        }
+    }
+
+    return ft_next_homepage_normalize_category_urls($value);
+}
+
+function ft_next_homepage_runtime_asset_path() {
+    $request_path = (string) wp_parse_url(wp_unslash($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+    $request_base = trailingslashit($request_path ?: '/');
+
+    return $request_base . 'public/';
+}
+
+function ft_next_homepage_normalize_static_html($html) {
+    $runtime_asset_path = ft_next_homepage_runtime_asset_path();
+    $uploads_url = trailingslashit(content_url('uploads'));
+    $asset_placeholder = '%%FT_NEXT_PUBLIC_PATH%%';
+    $uploads_placeholder = '%%FT_NEXT_UPLOADS_PATH%%';
+
+    $html = str_replace(
+        [
+            'https://floorstoday.ca/floorstodaystore/public/',
+            '/floorstodaystore/public/',
+            '/floorstodayhome/public/',
+            '/floorstoday/public/',
+            '/public/',
+        ],
+        $asset_placeholder,
+        $html
+    );
+
+    $html = str_replace(
+        [
+            'http://localhost/floorstodaystore/wp-content/uploads/',
+            'https://localhost/floorstodaystore/wp-content/uploads/',
+            '/floorstodaystore/wp-content/uploads/',
+            '/floorstodayhome/wp-content/uploads/',
+        ],
+        $uploads_placeholder,
+        $html
+    );
+
+    $html = ft_next_homepage_normalize_category_urls($html);
+
+    return str_replace(
+        [$asset_placeholder, $uploads_placeholder],
+        [$runtime_asset_path, $uploads_url],
+        $html
+    );
+}
+
+function ft_next_homepage_runtime_bridge($settings) {
+    $hero_badge_font_size = ft_next_homepage_css_length($settings['hero_badge_font_size'] ?? '', '16px');
+    $hero_badge_mobile_font_size = ft_next_homepage_css_length($settings['hero_badge_mobile_font_size'] ?? '', '14px');
+    $hero_badge_bg = (string) ($settings['hero_badge_bg_color'] ?? '#cc9c2e');
+    $hero_badge_text = (string) ($settings['hero_badge_text_color'] ?? '#ffffff');
+    $category_links = [];
+
+    if (is_array($settings['categories'] ?? null)) {
+        foreach ($settings['categories'] as $category) {
+            $slug = sanitize_title((string) ($category['slug'] ?? ''));
+            $url = ft_next_homepage_category_url($slug);
+
+            if ($slug !== '' && $url !== '') {
+                $category_links[$slug] = $url;
+            }
+        }
+    }
+
+    $bridge_settings = [
+        'hero_badge' => (string) ($settings['hero_badge'] ?? ''),
+        'hero_badge_font_size' => $hero_badge_font_size,
+        'hero_badge_mobile_font_size' => $hero_badge_mobile_font_size,
+        'category_links' => $category_links,
+        'deals_badge' => (string) ($settings['deals_badge'] ?? ''),
+        'deals_card_title' => (string) ($settings['deals_card_title'] ?? ''),
+        'deals_card_subtitle' => (string) ($settings['deals_card_subtitle'] ?? ''),
+    ];
+
+    return '<style id="ft-homepage-runtime-bridge">'
+        . '.ft-homepage-shell .ft-hero-badge{'
+        . 'font-size:' . esc_attr($hero_badge_font_size) . '!important;'
+        . 'padding-inline:16px!important;'
+        . 'padding-block:8px!important;'
+        . 'background-color:' . esc_attr($hero_badge_bg) . '!important;'
+        . 'color:' . esc_attr($hero_badge_text) . '!important;'
+        . 'line-height:1.2!important;width:auto!important;max-width:100%;height:auto!important;min-height:0!important;white-space:normal!important;'
+        . '}'
+        . '.ft-homepage-shell section[aria-labelledby="deals-heading"] [data-slot="badge"]{'
+        . 'font-size:14px!important;line-height:1.35!important;white-space:normal!important;height:auto!important;max-width:100%;'
+        . '}'
+        . '.ft-homepage-shell section[aria-labelledby="process-heading"] article>div:first-child>.absolute{top:16px!important;left:16px!important;}'
+        . '.ft-homepage-shell section[aria-labelledby="process-heading"] article>div:first-child>.absolute>div{'
+        . 'width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;'
+        . 'padding:7px 13px!important;border-radius:999px!important;background:#cc9c2e!important;'
+        . 'color:#fff!important;font-size:13px!important;font-weight:700!important;line-height:1!important;'
+        . 'box-shadow:0 10px 24px rgba(0,0,0,.18)!important;letter-spacing:0!important;'
+        . '}'
+        . '.ft-homepage-shell main>section:first-child h1+p+div.grid span{font-size:17px!important;}'
+        . '@media(max-width:1100px){'
+        . '.ft-homepage-shell main>section:first-child>div.relative>div.grid{grid-template-columns:minmax(0,1fr)!important;max-width:760px!important;margin-inline:auto!important;}'
+        . '.ft-homepage-shell main>section:first-child>div.relative>div.grid>div:first-child{max-width:680px!important;}'
+        . '.ft-homepage-shell #estimate{width:min(100%,680px)!important;max-width:680px!important;justify-self:center!important;margin-inline:auto!important;}'
+        . '}'
+        . '@media(min-width:641px) and (max-width:1024px){'
+        . '.ft-homepage-shell main>section:first-child h1+p+div.grid span{font-size:20px!important;}'
+        . '}'
+        . '@media(max-width:640px){'
+        . '.ft-homepage-shell main>section:first-child h1{font-size:36px!important;line-height:1.08!important;}'
+        . '.ft-homepage-shell main>section:first-child h1+p+div.grid span{font-size:15px!important;}'
+        . '.ft-homepage-shell #estimate{width:calc(100vw - 24px)!important;max-width:calc(100vw - 24px)!important;justify-self:center!important;margin-inline:auto!important;}'
+        . '.ft-homepage-shell .ft-hero-badge{display:inline-flex!important;width:auto!important;max-width:100%!important;justify-content:center;text-align:center;font-size:' . esc_attr($hero_badge_mobile_font_size) . '!important;}'
+        . '.ft-homepage-shell section[aria-labelledby="deals-heading"] [data-slot="badge"]{display:inline-flex!important;width:100%;justify-content:center;text-align:center;padding:4px 10px!important;}'
+        . '.ft-homepage-shell section[aria-labelledby="process-heading"] article>div:first-child>.absolute{top:12px!important;left:12px!important;}'
+        . '.ft-homepage-shell section[aria-labelledby="process-heading"] article>div:first-child>.absolute>div{font-size:12px!important;padding:6px 11px!important;}'
+        . '}'
+        . '</style>'
+        . '<script id="ft-homepage-runtime-bridge-script">(function(){'
+        . 'var s=' . wp_json_encode($bridge_settings, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) . ';'
+        . 'function text(el,value){if(el&&value)el.textContent=value;}'
+        . 'function styleHeroBadge(){var el=document.querySelector(".ft-homepage-shell .ft-hero-badge");if(!el)return;var mobile=window.matchMedia("(max-width:640px)").matches;el.style.setProperty("font-size",mobile?s.hero_badge_mobile_font_size:s.hero_badge_font_size,"important");el.style.setProperty("width","auto","important");el.style.setProperty("max-width","100%","important");el.style.setProperty("height","auto","important");el.style.setProperty("min-height","0","important");el.style.setProperty("padding-inline","16px","important");el.style.setProperty("padding-block","8px","important");}'
+        . 'function styleMobileForm(){var el=document.querySelector(".ft-homepage-shell #estimate");if(!el)return;var mobile=window.matchMedia("(max-width:640px)").matches;if(!mobile){el.style.removeProperty("width");el.style.removeProperty("max-width");el.style.removeProperty("justify-self");el.style.removeProperty("margin-inline");return;}el.style.setProperty("width","calc(100vw - 24px)","important");el.style.setProperty("max-width","calc(100vw - 24px)","important");el.style.setProperty("justify-self","center","important");el.style.setProperty("margin-inline","auto","important");}'
+        . 'function linkCategories(){var links=s.category_links||{};Object.keys(links).forEach(function(slug){var el=document.querySelector(".ft-homepage-shell section[aria-labelledby=\"categories-heading\"] a#"+CSS.escape(slug));if(el){el.dataset.ftCategoryUrl=links[slug];el.setAttribute("href",links[slug]);el.setAttribute("aria-label","View "+(el.querySelector("h3")?el.querySelector("h3").textContent:slug));}});}'
+        . 'function bindCategoryClicks(){var section=document.querySelector(".ft-homepage-shell section[aria-labelledby=\"categories-heading\"]");if(!section||section.dataset.ftClicksBound==="1")return;section.dataset.ftClicksBound="1";section.addEventListener("click",function(event){var card=event.target.closest("a[data-ft-category-url]");if(!card)return;event.preventDefault();event.stopPropagation();window.location.href=card.dataset.ftCategoryUrl;},true);}'
+        . 'function apply(){'
+        . 'text(document.querySelector(".ft-homepage-shell .ft-hero-badge"),s.hero_badge);'
+        . 'styleHeroBadge();'
+        . 'styleMobileForm();'
+        . 'linkCategories();'
+        . 'bindCategoryClicks();'
+        . 'text(document.querySelector(".ft-homepage-shell section[aria-labelledby=\"deals-heading\"] [data-slot=\"badge\"]"),s.deals_badge);'
+        . 'var sale=document.querySelector(".ft-homepage-shell .ft-sale-badge");'
+        . 'text(sale,s.deals_card_subtitle);'
+        . 'if(sale&&sale.previousElementSibling&&s.deals_card_title)text(sale.previousElementSibling,s.deals_card_title);'
+        . 'document.querySelectorAll(".ft-homepage-shell section[aria-labelledby=\"process-heading\"] article>div:first-child>.absolute>div").forEach(function(el,i){el.textContent="Step "+(i+1);});'
+        . '}'
+        . 'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){setTimeout(apply,350);});}else{setTimeout(apply,350);}'
+        . 'window.addEventListener("load",function(){setTimeout(apply,150);});window.addEventListener("resize",function(){styleHeroBadge();styleMobileForm();});setTimeout(apply,900);setTimeout(apply,1600);'
+        . '})();</script>' . "\n";
 }
 
 function ft_next_clean_text($value) {
@@ -304,16 +546,9 @@ add_action('template_redirect', function () {
         return;
     }
 
-    // Derive the asset prefix from the requested front-page URL. This avoids
-    // stale home_url() subdirectory values after a database is moved.
-    $request_path = (string) wp_parse_url(wp_unslash($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
-    $request_base = trailingslashit($request_path ?: '/');
-    $runtime_asset_path = $request_base . 'public/';
-    $html = str_replace(
-        ['/floorstoday/public/', '/public/'],
-        $runtime_asset_path,
-        $html
-    );
+    // Derive URLs from the current request/site instead of trusting paths baked
+    // into the static Next export.
+    $html = ft_next_homepage_normalize_static_html($html);
 
     $settings = ft_next_homepage_settings();
     $seo_title = $settings['seo_title'];
@@ -356,7 +591,7 @@ add_action('template_redirect', function () {
         . '<meta name="twitter:description" content="' . esc_attr($seo_og_description) . '">' . "\n"
         . '<meta name="twitter:image" content="' . esc_url($seo_og_image) . '">' . "\n";
 
-    $html = str_replace('</head>', $seo_tags . '</head>', $html);
+    $html = str_replace('</head>', $seo_tags . ft_next_homepage_runtime_bridge($settings) . '</head>', $html);
 
     $schema = [
         '@context' => 'https://schema.org',
@@ -380,12 +615,8 @@ add_action('template_redirect', function () {
         1
     );
 
-    // Settings can contain URLs saved before the site was moved.
-    $html = str_replace(
-        ['/floorstoday/public/', '/public/'],
-        $runtime_asset_path,
-        $html
-    );
+    // Settings and static markup can contain URLs saved before the site moved.
+    $html = ft_next_homepage_normalize_static_html($html);
 
     status_header(200);
     nocache_headers();
@@ -938,6 +1169,10 @@ add_action('admin_enqueue_scripts', function ($hook) {
             grid-template-columns: repeat(2, minmax(120px, 180px));
             justify-content: start;
         }
+        .ft-next-inline-grid--badge-numbers {
+            grid-template-columns: repeat(3, minmax(140px, 1fr));
+            align-items: end;
+        }
         .ft-next-button-style-grid {
             display: grid;
             grid-template-columns: repeat(5, minmax(130px, 1fr));
@@ -1202,6 +1437,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
             .ft-next-inline-grid--4,
             .ft-next-inline-grid--header,
             .ft-next-inline-grid--badge-style,
+            .ft-next-inline-grid--badge-numbers,
             .ft-next-inline-grid--compact-values,
             .ft-next-button-style-grid,
             .ft-next-style-grid,
@@ -1243,6 +1479,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
             .ft-next-inline-grid--3,
             .ft-next-inline-grid--4,
             .ft-next-inline-grid--badge-style,
+            .ft-next-inline-grid--badge-numbers,
             .ft-next-inline-grid--compact-values,
             .ft-next-button-style-grid,
             .ft-next-style-grid,
@@ -1424,7 +1661,7 @@ add_action('admin_post_ft_next_homepage_save', function () {
         'phone', 'email', 'service_area', 'logo_text', 'logo_image', 'favicon_image', 'logo_size', 'cta_label',
         'facebook_url', 'instagram_url', 'linkedin_url', 'youtube_url', 'tiktok_url',
         'seo_title', 'seo_canonical_url', 'seo_robots', 'seo_og_title', 'seo_og_image', 'hero_badge',
-        'hero_badge_font_size', 'hero_badge_padding_x', 'hero_badge_padding_y',
+        'hero_badge_font_size', 'hero_badge_mobile_font_size', 'hero_badge_padding_x', 'hero_badge_padding_y',
         'hero_title', 'hero_highlight', 'hero_badge_animation_location', 'hero_badge_animation_speed', 'form_title', 'form_subtitle',
         'process_title', 'comparison_title', 'comparison_table_title', 'comparison_button',
         'cta_title', 'cta_subtitle', 'cta_button', 'hero_image', 'hero_overlay_opacity',
@@ -1839,20 +2076,26 @@ function ft_next_homepage_render_admin() {
                                                 Text color
                                                 <?php ft_next_homepage_color_control($settings, 'hero_badge_text_color'); ?>
                                             </label>
+                                        </div>
+                                        <div class="ft-next-inline-grid ft-next-inline-grid--badge-numbers" style="margin-bottom:0;">
                                             <label>
                                                 Font size
                                                 <input name="hero_badge_font_size" type="text" value="<?php echo esc_attr($settings['hero_badge_font_size']); ?>">
                                             </label>
-                                        </div>
-                                        <div class="ft-next-inline-grid ft-next-inline-grid--compact-values" style="margin-bottom:0;">
                                             <label>
-                                                Horizontal padding
-                                                <input name="hero_badge_padding_x" type="text" value="<?php echo esc_attr($settings['hero_badge_padding_x']); ?>">
+                                                Mobile font size
+                                                <input name="hero_badge_mobile_font_size" type="text" value="<?php echo esc_attr($settings['hero_badge_mobile_font_size']); ?>">
                                             </label>
-                                            <label>
-                                                Vertical padding
-                                                <input name="hero_badge_padding_y" type="text" value="<?php echo esc_attr($settings['hero_badge_padding_y']); ?>">
-                                            </label>
+                                            <div class="ft-next-inline-grid ft-next-inline-grid--compact-values" style="margin-bottom:0;">
+                                                <label>
+                                                    Horizontal padding
+                                                    <input name="hero_badge_padding_x" type="text" value="<?php echo esc_attr($settings['hero_badge_padding_x']); ?>">
+                                                </label>
+                                                <label>
+                                                    Vertical padding
+                                                    <input name="hero_badge_padding_y" type="text" value="<?php echo esc_attr($settings['hero_badge_padding_y']); ?>">
+                                                </label>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -2957,13 +3200,14 @@ function ft_next_footer_shortcode() {
             .ft-sh-footer-social {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 10px;
+                gap: 9px;
                 margin-top: 24px;
             }
             .ft-sh-footer-social a {
                 display: inline-flex;
-                width: 32px;
-                height: 32px;
+                width: 34px;
+                height: 34px;
+                flex: 0 0 34px;
                 align-items: center;
                 justify-content: center;
                 border: 1px solid rgba(255, 255, 255, .25);
@@ -2971,6 +3215,7 @@ function ft_next_footer_shortcode() {
                 background: rgba(255, 255, 255, .10);
                 color: #fff;
                 font-weight: 800;
+                line-height: 1;
                 text-decoration: none;
             }
             .ft-sh-footer-social a:hover,
@@ -2980,8 +3225,10 @@ function ft_next_footer_shortcode() {
                 color: #fff;
             }
             .ft-sh-footer-social svg {
-                width: 16px;
-                height: 16px;
+                display: block;
+                width: 14px !important;
+                height: 14px !important;
+                flex: 0 0 14px;
             }
             .ft-sh-footer-bottom {
                 display: flex;
@@ -3036,6 +3283,20 @@ function ft_next_footer_shortcode() {
                 }
                 .ft-sh-footer-logo img {
                     max-width: 210px;
+                }
+                .ft-sh-footer-social {
+                    gap: 8px;
+                    margin-top: 22px;
+                }
+                .ft-sh-footer-social a {
+                    width: 32px;
+                    height: 32px;
+                    flex-basis: 32px;
+                }
+                .ft-sh-footer-social svg {
+                    width: 13px !important;
+                    height: 13px !important;
+                    flex-basis: 13px;
                 }
             }
         </style>
@@ -3110,7 +3371,8 @@ function ft_next_footer_shortcode() {
                             if ($name === '') {
                                 continue;
                             }
-                            $url = $slug !== '' ? home_url('/product-category/' . sanitize_title($slug) . '/') : '#';
+                            $url = $slug !== '' ? ft_next_homepage_category_url($slug) : '';
+                            $url = $url !== '' ? $url : '#';
                             ?>
                             <li><a href="<?php echo esc_url($url); ?>"><?php echo esc_html($name); ?></a></li>
                         <?php endforeach; ?>
@@ -3192,9 +3454,10 @@ function ft_next_booking_form_shortcode() {
                 box-shadow: none;
             }
             .ft-bf {
-                width: 100%;
-                max-width: none;
-                margin-inline: 0;
+                display: block;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin-inline: 0 !important;
                 padding: clamp(20px, 5vw, 36px);
                 overflow: hidden;
                 border: 1px solid rgba(255, 255, 255, .5);
@@ -3204,6 +3467,12 @@ function ft_next_booking_form_shortcode() {
                 color: #0f172a;
                 font-family: inherit;
                 font-size: 14px;
+            }
+            .elementor-shortcode > .ft-bf,
+            .elementor-widget-shortcode .ft-bf,
+            .elementor-widget-container > .ft-bf {
+                width: 100% !important;
+                max-width: 100% !important;
             }
             .ft-bf__heading { margin-bottom: 0; text-align: center; }
             .ft-bf__title { margin: 0; color: #020617; font-family: Georgia, "Times New Roman", serif; font-size: clamp(24px, 4vw, 30px); font-weight: 700; line-height: 1.2; }

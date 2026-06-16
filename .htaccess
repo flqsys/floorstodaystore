@@ -1,11 +1,4 @@
 
-# Serve the exported Next.js homepage from /public.
-<IfModule mod_rewrite.c>
-RewriteEngine On
-RewriteCond %{QUERY_STRING} ^$
-RewriteRule ^$ public/index.html [L]
-</IfModule>
-
 # BEGIN WordPress
 # The directives (lines) between `BEGIN WordPress` and `END WordPress` are
 # dynamically generated, and should only be modified via WordPress filters.
