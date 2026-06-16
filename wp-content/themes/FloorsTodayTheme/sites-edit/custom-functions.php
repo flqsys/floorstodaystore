@@ -85,11 +85,18 @@ function ft_enqueue_frontend_styles() {
             width: 100%;
         }
 
-        body:not(.elementor-template-canvas) .site-main {
-            max-width: 1180px;
-            margin: 0 auto;
-            padding: 48px 24px 72px;
-        }
+body.elementor-page:not(.elementor-template-canvas) .site-main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+body:not(.elementor-page):not(.elementor-template-canvas) .site-main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 48px 24px 72px;
+}
 
         .page-header {
             margin-bottom: 24px;
