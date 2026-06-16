@@ -1,4 +1,4 @@
-# Local secrets
+# Secrets
 /wp-config.php
 /wp-config-local.php
 /.env
@@ -8,45 +8,49 @@
 !.env.example
 !/public/.env.example
 
-# WordPress core, user uploads, backups, caches, logs, and temporary files
-/wp-admin/
-/wp-includes/
-/wp-content/uploads/
-/wp-content/wpvividbackups/
-/wp-content/wflogs/
+# WordPress caches, backups, logs
 /wp-content/cache/
 /wp-content/upgrade/
+/wp-content/wpvividbackups/
 /wp-content/ai1wm-backups/
 /wp-content/backups/
+/wp-content/wflogs/
 /wp-content/debug.log
+
+# Dependencies
+/node_modules/
+/public/node_modules/
+
+# Build output
+/public/.next/
+/public/out/
+/public/_next/
+/live-build/
+
+# Vercel / AI tools
+/public/.vercel/
+/public/.snowflake/
+/public/.v0-trash/
+
+# Deployee runtime files
+/deployee/storage/*
+!/deployee/storage/.gitignore
+!/deployee/storage/.htaccess
+
+# Database dumps & archives
 *.sql
 *.zip
 *.tar
 *.tar.gz
 *.tgz
+
+# Logs
 *.log
-*.md
 
-# Next.js dependencies and generated output
-/public/node_modules/
-/public/.next/
-/public/out/
-/public/_next/
-/public/*.html
-/public/*.txt
-/public/.vercel/
-/public/.snowflake/
-/public/.v0-trash/
-/public/.env*.local
-/live-build/
+# IDE
+.vscode/
+.idea/
 
-# Deployee runtime settings and generated database backups
-/deployee/storage/*
-!/deployee/storage/.gitignore
-!/deployee/storage/.htaccess
-
-# OS/editor noise
+# OS
 .DS_Store
 Thumbs.db
-.idea/
-.vscode/
