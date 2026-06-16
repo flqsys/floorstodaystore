@@ -37,6 +37,11 @@
 !/deployee/storage/.gitignore
 !/deployee/storage/.htaccess
 
+.htaccess
+.htaccess.bak
+wp-config.php
+wp-config.php.bak
+
 # Database dumps & archives
 *.sql
 *.zip
