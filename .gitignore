@@ -11,6 +11,8 @@
 # WordPress caches, backups, logs
 /wp-content/cache/
 /wp-content/upgrade/
+/wp-content/uploads/
+/wp-content/uploads/elementor/css/
 /wp-content/wpvividbackups/
 /wp-content/ai1wm-backups/
 /wp-content/backups/
