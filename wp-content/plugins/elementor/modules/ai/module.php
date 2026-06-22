@@ -348,11 +348,9 @@ class Module extends BaseModule {
 
 			if ( ! $image_id ) {
 				$product = wc_get_product( $post_id );
-				if ( $product ) {
-					$gallery_image_ids = $product->get_gallery_image_ids();
-					if ( ! empty( $gallery_image_ids ) ) {
-						$image_id = $gallery_image_ids[0];
-					}
+				$gallery_image_ids = $product->get_gallery_image_ids();
+				if ( ! empty( $gallery_image_ids ) ) {
+					$image_id = $gallery_image_ids[0];
 				}
 			}
 

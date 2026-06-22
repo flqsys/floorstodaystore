@@ -380,12 +380,43 @@ function ft_next_homepage_normalize_static_html($html) {
     );
 }
 
+function ft_next_homepage_attribution_script() {
+    return '<script id="ft-attribution-tracker">(function(){'
+        . 'if(window.ftGetAttribution)return;'
+        . 'var key="ft_attribution_v1";'
+        . 'var maxAge=90*24*60*60*1000;'
+        . 'var socialHosts={'
+        . '"facebook.com":"facebook","m.facebook.com":"facebook","l.facebook.com":"facebook","lm.facebook.com":"facebook","instagram.com":"instagram","l.instagram.com":"instagram","tiktok.com":"tiktok","vm.tiktok.com":"tiktok","linkedin.com":"linkedin","lnkd.in":"linkedin","youtube.com":"youtube","youtu.be":"youtube","pinterest.com":"pinterest","x.com":"x","twitter.com":"x"'
+        . '};'
+        . 'function read(){try{var raw=localStorage.getItem(key);if(!raw)return null;var data=JSON.parse(raw);if(!data.createdAt||Date.now()-data.createdAt>maxAge){localStorage.removeItem(key);return null;}return data;}catch(e){return null;}}'
+        . 'function host(url){try{return new URL(url).hostname.replace(/^www\./,"").toLowerCase();}catch(e){return "";}}'
+        . 'function socialSource(refHost){if(!refHost)return "";if(socialHosts[refHost])return socialHosts[refHost];var keys=Object.keys(socialHosts);for(var i=0;i<keys.length;i++){if(refHost.endsWith("."+keys[i]))return socialHosts[keys[i]];}return "";}'
+        . 'function current(){var pageUrl=new URL(window.location.href);var params=pageUrl.searchParams;var ref=document.referrer||"";var refHost=host(ref);var ownHost=host(window.location.href);if(refHost===ownHost)refHost="";var utmSource=params.get("hello_social")||params.get("utm_source")||"";var data={createdAt:Date.now(),pageUrl:window.location.href,landingPage:window.location.href,referrerUrl:ref,referrerHost:refHost,utmSource:utmSource,utmMedium:params.get("utm_medium")||"",utmCampaign:params.get("utm_campaign")||"",utmContent:params.get("utm_content")||"",utmTerm:params.get("utm_term")||"",trafficSource:utmSource||socialSource(refHost)||refHost||"Direct"};return data;}'
+        . 'function capture(){var existing=read();var data=current();var hasCampaign=data.utmSource||data.utmMedium||data.utmCampaign||data.utmContent||data.utmTerm||data.referrerHost;if(!existing&&hasCampaign){try{localStorage.setItem(key,JSON.stringify(data));}catch(e){}return data;}return existing||data;}'
+        . 'function decorateLinks(){var data=read()||capture();var source=data&&data.utmSource?data.utmSource:"";if(!source)return;document.querySelectorAll("a[href]").forEach(function(a){var raw=a.getAttribute("href")||"";if(!raw||raw.charAt(0)==="#"||/^(mailto:|tel:|sms:|javascript:)/i.test(raw))return;try{var url=new URL(raw,window.location.href);if(!/^https?:$/.test(url.protocol)||url.hostname!==window.location.hostname)return;if(/\/(wp-admin|wp-login\.php|wp-json)(\/|$)/.test(url.pathname))return;if(url.searchParams.get("hello_social")===source)return;url.searchParams.set("hello_social",source);a.setAttribute("href",url.pathname+url.search+url.hash);}catch(e){}});}'
+        . 'window.ftGetAttribution=function(){return capture();};'
+        . 'capture();'
+        . 'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",decorateLinks);}else{decorateLinks();}'
+        . 'window.addEventListener("load",decorateLinks);'
+        . 'setTimeout(decorateLinks,800);'
+        . '})();</script>' . "\n";
+}
+
+add_action('wp_head', function () {
+    if (!is_admin()) {
+        echo ft_next_homepage_attribution_script();
+    }
+}, 1);
+
 function ft_next_homepage_runtime_bridge($settings) {
     $hero_badge_font_size = ft_next_homepage_css_length($settings['hero_badge_font_size'] ?? '', '16px');
     $hero_badge_mobile_font_size = ft_next_homepage_css_length($settings['hero_badge_mobile_font_size'] ?? '', '14px');
     $hero_badge_bg = (string) ($settings['hero_badge_bg_color'] ?? '#cc9c2e');
     $hero_badge_text = (string) ($settings['hero_badge_text_color'] ?? '#ffffff');
     $category_links = [];
+    $nav_items = [];
+    $phone = (string) ($settings['phone'] ?? '');
+    $phone_href = preg_replace('/[^0-9+]/', '', $phone);
 
     if (is_array($settings['categories'] ?? null)) {
         foreach ($settings['categories'] as $category) {
@@ -398,17 +429,35 @@ function ft_next_homepage_runtime_bridge($settings) {
         }
     }
 
+    if (is_array($settings['nav_items'] ?? null)) {
+        foreach ($settings['nav_items'] as $item) {
+            $name = trim((string) ($item['name'] ?? ''));
+            $href = ft_next_header_shortcode_url((string) ($item['href'] ?? ''));
+
+            if ($name !== '' && $href !== '#') {
+                $nav_items[] = [
+                    'name' => $name,
+                    'href' => $href,
+                ];
+            }
+        }
+    }
+
     $bridge_settings = [
         'hero_badge' => (string) ($settings['hero_badge'] ?? ''),
         'hero_badge_font_size' => $hero_badge_font_size,
         'hero_badge_mobile_font_size' => $hero_badge_mobile_font_size,
         'category_links' => $category_links,
+        'nav_items' => $nav_items,
+        'phone' => $phone,
+        'phone_href' => $phone_href !== '' ? 'tel:' . $phone_href : '',
         'deals_badge' => (string) ($settings['deals_badge'] ?? ''),
         'deals_card_title' => (string) ($settings['deals_card_title'] ?? ''),
         'deals_card_subtitle' => (string) ($settings['deals_card_subtitle'] ?? ''),
     ];
 
-    return '<style id="ft-homepage-runtime-bridge">'
+    return ft_next_homepage_attribution_script()
+        . '<style id="ft-homepage-runtime-bridge">'
         . '.ft-homepage-shell .ft-hero-badge{'
         . 'font-size:' . esc_attr($hero_badge_font_size) . '!important;'
         . 'padding-inline:16px!important;'
@@ -428,18 +477,23 @@ function ft_next_homepage_runtime_bridge($settings) {
         . 'box-shadow:0 10px 24px rgba(0,0,0,.18)!important;letter-spacing:0!important;'
         . '}'
         . '.ft-homepage-shell main>section:first-child h1+p+div.grid span{font-size:17px!important;}'
+        . '.ft-homepage-shell .ft-runtime-mobile-menu{display:none;background:#fff;border-top:1px solid #e5e7eb;padding:8px 16px 16px;box-shadow:0 10px 20px rgba(0,0,0,.08);}'
+        . '.ft-homepage-shell .ft-runtime-mobile-menu.is-open{display:block;}'
+        . '.ft-homepage-shell .ft-runtime-mobile-menu a{display:block;padding:10px 0;color:var(--foreground);font-weight:600;text-decoration:none;}'
+        . '.ft-homepage-shell .ft-runtime-mobile-menu a:hover,.ft-homepage-shell .ft-runtime-mobile-menu a:focus-visible{color:var(--primary);}'
         . '@media(max-width:1100px){'
-        . '.ft-homepage-shell main>section:first-child>div.relative>div.grid{grid-template-columns:minmax(0,1fr)!important;max-width:760px!important;margin-inline:auto!important;}'
-        . '.ft-homepage-shell main>section:first-child>div.relative>div.grid>div:first-child{max-width:680px!important;}'
-        . '.ft-homepage-shell #estimate{width:min(100%,680px)!important;max-width:680px!important;justify-self:center!important;margin-inline:auto!important;}'
+        . '.ft-homepage-shell main>section:first-child>div.relative>div.grid{grid-template-columns:minmax(0,1fr)!important;width:100%!important;max-width:none!important;margin-inline:0!important;}'
+        . '.ft-homepage-shell main>section:first-child>div.relative>div.grid>div:first-child{width:100%!important;max-width:none!important;}'
+        . '.ft-homepage-shell #estimate{width:100%!important;max-width:100%!important;justify-self:stretch!important;margin-inline:0!important;}'
         . '}'
+        . '@media(min-width:1025px){.ft-homepage-shell .ft-runtime-mobile-menu{display:none!important;}}'
         . '@media(min-width:641px) and (max-width:1024px){'
         . '.ft-homepage-shell main>section:first-child h1+p+div.grid span{font-size:20px!important;}'
         . '}'
         . '@media(max-width:640px){'
         . '.ft-homepage-shell main>section:first-child h1{font-size:36px!important;line-height:1.08!important;}'
         . '.ft-homepage-shell main>section:first-child h1+p+div.grid span{font-size:15px!important;}'
-        . '.ft-homepage-shell #estimate{width:calc(100vw - 24px)!important;max-width:calc(100vw - 24px)!important;justify-self:center!important;margin-inline:auto!important;}'
+        . '.ft-homepage-shell #estimate{width:calc(100vw - 24px)!important;max-width:calc(100vw - 24px)!important;justify-self:center!important;margin-inline:auto!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important;}'
         . '.ft-homepage-shell .ft-hero-badge{display:inline-flex!important;width:auto!important;max-width:100%!important;justify-content:center;text-align:center;font-size:' . esc_attr($hero_badge_mobile_font_size) . '!important;}'
         . '.ft-homepage-shell section[aria-labelledby="deals-heading"] [data-slot="badge"]{display:inline-flex!important;width:100%;justify-content:center;text-align:center;padding:4px 10px!important;}'
         . '.ft-homepage-shell section[aria-labelledby="process-heading"] article>div:first-child>.absolute{top:12px!important;left:12px!important;}'
@@ -450,13 +504,15 @@ function ft_next_homepage_runtime_bridge($settings) {
         . 'var s=' . wp_json_encode($bridge_settings, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) . ';'
         . 'function text(el,value){if(el&&value)el.textContent=value;}'
         . 'function styleHeroBadge(){var el=document.querySelector(".ft-homepage-shell .ft-hero-badge");if(!el)return;var mobile=window.matchMedia("(max-width:640px)").matches;el.style.setProperty("font-size",mobile?s.hero_badge_mobile_font_size:s.hero_badge_font_size,"important");el.style.setProperty("width","auto","important");el.style.setProperty("max-width","100%","important");el.style.setProperty("height","auto","important");el.style.setProperty("min-height","0","important");el.style.setProperty("padding-inline","16px","important");el.style.setProperty("padding-block","8px","important");}'
-        . 'function styleMobileForm(){var el=document.querySelector(".ft-homepage-shell #estimate");if(!el)return;var mobile=window.matchMedia("(max-width:640px)").matches;if(!mobile){el.style.removeProperty("width");el.style.removeProperty("max-width");el.style.removeProperty("justify-self");el.style.removeProperty("margin-inline");return;}el.style.setProperty("width","calc(100vw - 24px)","important");el.style.setProperty("max-width","calc(100vw - 24px)","important");el.style.setProperty("justify-self","center","important");el.style.setProperty("margin-inline","auto","important");}'
+        . 'function styleMobileForm(){var el=document.querySelector(".ft-homepage-shell #estimate");if(!el)return;var mobile=window.matchMedia("(max-width:640px)").matches;var stacked=window.matchMedia("(max-width:1100px)").matches;if(!stacked){["width","max-width","justify-self","margin-inline","position","left","transform"].forEach(function(p){el.style.removeProperty(p);});return;}if(mobile){el.style.setProperty("width","calc(100vw - 24px)","important");el.style.setProperty("max-width","calc(100vw - 24px)","important");el.style.setProperty("justify-self","center","important");el.style.setProperty("margin-inline","auto","important");el.style.setProperty("position","relative","important");el.style.setProperty("left","50%","important");el.style.setProperty("transform","translateX(-50%)","important");return;}el.style.setProperty("width","100%","important");el.style.setProperty("max-width","100%","important");el.style.setProperty("justify-self","stretch","important");el.style.setProperty("margin-inline","0","important");["position","left","transform"].forEach(function(p){el.style.removeProperty(p);});}'
+        . 'function ensureMobileMenu(){var header=document.querySelector(".ft-homepage-shell header");if(!header)return;var icon=header.querySelector("svg.lucide-menu");var button=icon?icon.closest("button"):null;if(!button)return;var panel=header.querySelector(".ft-runtime-mobile-menu");if(!panel){panel=document.createElement("nav");panel.className="ft-runtime-mobile-menu";panel.setAttribute("aria-label","Mobile navigation");panel.id="ft-runtime-mobile-menu";(s.nav_items||[]).forEach(function(item){var a=document.createElement("a");a.href=item.href;a.textContent=item.name;panel.appendChild(a);});if(s.phone&&s.phone_href){var p=document.createElement("a");p.href=s.phone_href;p.textContent=s.phone;panel.appendChild(p);}header.appendChild(panel);}button.setAttribute("aria-controls","ft-runtime-mobile-menu");button.setAttribute("aria-expanded",panel.classList.contains("is-open")?"true":"false");if(header.dataset.ftRuntimeMenuBound==="1")return;header.dataset.ftRuntimeMenuBound="1";button.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();var open=!panel.classList.contains("is-open");panel.classList.toggle("is-open",open);button.setAttribute("aria-expanded",open?"true":"false");},true);panel.addEventListener("click",function(event){if(event.target.closest("a")){panel.classList.remove("is-open");button.setAttribute("aria-expanded","false");}});}'
         . 'function linkCategories(){var links=s.category_links||{};Object.keys(links).forEach(function(slug){var el=document.querySelector(".ft-homepage-shell section[aria-labelledby=\"categories-heading\"] a#"+CSS.escape(slug));if(el){el.dataset.ftCategoryUrl=links[slug];el.setAttribute("href",links[slug]);el.setAttribute("aria-label","View "+(el.querySelector("h3")?el.querySelector("h3").textContent:slug));}});}'
         . 'function bindCategoryClicks(){var section=document.querySelector(".ft-homepage-shell section[aria-labelledby=\"categories-heading\"]");if(!section||section.dataset.ftClicksBound==="1")return;section.dataset.ftClicksBound="1";section.addEventListener("click",function(event){var card=event.target.closest("a[data-ft-category-url]");if(!card)return;event.preventDefault();event.stopPropagation();window.location.href=card.dataset.ftCategoryUrl;},true);}'
         . 'function apply(){'
         . 'text(document.querySelector(".ft-homepage-shell .ft-hero-badge"),s.hero_badge);'
         . 'styleHeroBadge();'
         . 'styleMobileForm();'
+        . 'ensureMobileMenu();'
         . 'linkCategories();'
         . 'bindCategoryClicks();'
         . 'text(document.querySelector(".ft-homepage-shell section[aria-labelledby=\"deals-heading\"] [data-slot=\"badge\"]"),s.deals_badge);'
@@ -515,6 +571,14 @@ add_action('admin_menu', function () {
         'ft_next_homepage_render_admin',
         'dashicons-admin-home',
         58
+    );
+    add_submenu_page(
+        'ft-next-homepage',
+        'Social UTM Links',
+        'Social UTM Links',
+        'manage_options',
+        'ft-next-homepage-utm',
+        'ft_next_homepage_render_utm_admin'
     );
 });
 
@@ -636,7 +700,7 @@ add_action('admin_enqueue_scripts', function () {
 });
 
 add_action('admin_enqueue_scripts', function ($hook) {
-    if ($hook !== 'toplevel_page_ft-next-homepage') {
+    if ($hook !== 'toplevel_page_ft-next-homepage' && !str_contains((string) $hook, 'ft-next-homepage')) {
         return;
     }
 
@@ -944,6 +1008,44 @@ add_action('admin_enqueue_scripts', function ($hook) {
             overflow: hidden;
             border: 1px solid #d9e2ea;
             box-shadow: none;
+        }
+        .ft-next-utm-table input {
+            width: 100%;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 12px;
+        }
+        .ft-next-utm-table td:first-child {
+            width: 96px;
+            font-weight: 700;
+            color: #17202a;
+        }
+        .ft-next-utm-copy-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 38px;
+            gap: 8px;
+            align-items: center;
+        }
+        .ft-next-utm-copy {
+            display: inline-flex;
+            width: 38px;
+            height: 38px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #cbd5df;
+            border-radius: 8px;
+            background: #fff;
+            color: #155f99;
+            cursor: pointer;
+        }
+        .ft-next-utm-copy:hover,
+        .ft-next-utm-copy:focus-visible {
+            border-color: #155f99;
+            box-shadow: 0 0 0 2px rgba(21, 95, 153, .12);
+            outline: none;
+        }
+        .ft-next-utm-copy.is-copied {
+            color: #047857;
+            border-color: #047857;
         }
         .ft-next-table th {
             background: #f8fafc;
@@ -1892,6 +1994,34 @@ function ft_next_homepage_gradient_controls($settings, $prefix) {
     echo '</div>';
 }
 
+function ft_next_homepage_utm_links() {
+    $base_url = 'https://floorstoday.ca';
+    $platforms = [
+        'Facebook' => 'facebook',
+        'Instagram' => 'instagram',
+        'TikTok' => 'tiktok',
+        'LinkedIn' => 'linkedin',
+        'YouTube' => 'youtube',
+        'Pinterest' => 'pinterest',
+        'X / Twitter' => 'x',
+    ];
+    $links = [];
+
+    foreach ($platforms as $label => $source) {
+        $links[] = [
+            'label' => $label,
+            'url' => add_query_arg(
+                [
+                    'hello_social' => $source,
+                ],
+                $base_url . '/'
+            ),
+        ];
+    }
+
+    return $links;
+}
+
 function ft_next_homepage_render_admin() {
     $settings = ft_next_homepage_settings();
     $endpoint = rest_url('floors-today/v1/homepage');
@@ -2684,6 +2814,82 @@ function ft_next_homepage_render_admin() {
             </div>
         </form>
     </div>
+    <?php
+}
+
+function ft_next_homepage_render_utm_admin() {
+    ?>
+    <div class="wrap ft-next-admin">
+        <div class="ft-next-hero">
+            <div>
+                <h1>Social UTM Links</h1>
+                <p class="ft-next-muted">Copy these links into social posts so leads show the original traffic source in the inbox.</p>
+                <nav class="ft-next-quicknav" aria-label="UTM sections"></nav>
+            </div>
+            <div class="ft-next-endpoint">
+                <strong>Tracking domain</strong>
+                <code>https://floorstoday.ca/</code>
+                <strong style="display:block;margin-top:12px;">Lead attribution</strong>
+                <code>hello_social saved for 90 days</code>
+            </div>
+        </div>
+
+        <?php ft_next_homepage_card_open('Social UTM Links'); ?>
+            <p class="description" style="margin-top:0;">Copy the matching link into each social profile, post, bio link, or ad.</p>
+            <table class="widefat striped ft-next-table ft-next-utm-table">
+                <thead><tr><th>Social</th><th>Tracking link</th></tr></thead>
+                <tbody>
+                <?php foreach (ft_next_homepage_utm_links() as $utm_link) : ?>
+                    <tr>
+                        <td><?php echo esc_html($utm_link['label']); ?></td>
+                        <td>
+                            <div class="ft-next-utm-copy-row">
+                                <input type="text" readonly onclick="this.select();" value="<?php echo esc_attr($utm_link['url']); ?>">
+                                <button type="button" class="ft-next-utm-copy" aria-label="<?php echo esc_attr('Copy ' . $utm_link['label'] . ' link'); ?>" data-copy="<?php echo esc_attr($utm_link['url']); ?>">
+                                    <span class="dashicons dashicons-admin-page" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php ft_next_homepage_card_close(); ?>
+    </div>
+    <script>
+        document.addEventListener('click', function (event) {
+            var button = event.target.closest('.ft-next-utm-copy');
+
+            if (!button) {
+                return;
+            }
+
+            var value = button.getAttribute('data-copy') || '';
+            var done = function () {
+                button.classList.add('is-copied');
+                button.innerHTML = '<span class="dashicons dashicons-yes" aria-hidden="true"></span>';
+                setTimeout(function () {
+                    button.classList.remove('is-copied');
+                    button.innerHTML = '<span class="dashicons dashicons-admin-page" aria-hidden="true"></span>';
+                }, 1400);
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(value).then(done).catch(function () {
+                    var input = button.closest('.ft-next-utm-copy-row').querySelector('input');
+                    input.select();
+                    document.execCommand('copy');
+                    done();
+                });
+                return;
+            }
+
+            var input = button.closest('.ft-next-utm-copy-row').querySelector('input');
+            input.select();
+            document.execCommand('copy');
+            done();
+        });
+    </script>
     <?php
 }
 
@@ -3780,7 +3986,11 @@ function ft_next_booking_form_shortcode() {
                     var pageUrl = new URL(window.location.href);
                     var referrer = document.referrer || '';
                     var referrerHost = referrer ? new URL(referrer).hostname.replace(/^www\./, '') : '';
-                    var utmSource = pageUrl.searchParams.get('utm_source') || '';
+                    var utmSource = pageUrl.searchParams.get('hello_social') || pageUrl.searchParams.get('utm_source') || '';
+                    var attribution = window.ftGetAttribution ? window.ftGetAttribution() : {};
+                    utmSource = attribution.utmSource || utmSource;
+                    referrer = attribution.referrerUrl || referrer;
+                    referrerHost = attribution.referrerHost || referrerHost;
                     var response = await fetch(root.dataset.endpoint, {
                         method: 'POST',
                         credentials: 'same-origin',
@@ -3796,13 +4006,13 @@ function ft_next_booking_form_shortcode() {
                             ftInboxTrap: data.get('ftInboxTrap'),
                             source: 'WordPress booking form shortcode',
                             pageUrl: window.location.href,
-                            trafficSource: utmSource || referrerHost || 'Direct',
+                            trafficSource: attribution.trafficSource || utmSource || referrerHost || 'Direct',
                             referrerUrl: referrer,
                             utmSource: utmSource,
-                            utmMedium: pageUrl.searchParams.get('utm_medium') || '',
-                            utmCampaign: pageUrl.searchParams.get('utm_campaign') || '',
-                            utmContent: pageUrl.searchParams.get('utm_content') || '',
-                            utmTerm: pageUrl.searchParams.get('utm_term') || '',
+                            utmMedium: attribution.utmMedium || pageUrl.searchParams.get('utm_medium') || '',
+                            utmCampaign: attribution.utmCampaign || pageUrl.searchParams.get('utm_campaign') || '',
+                            utmContent: attribution.utmContent || pageUrl.searchParams.get('utm_content') || '',
+                            utmTerm: attribution.utmTerm || pageUrl.searchParams.get('utm_term') || '',
                             devicePlatform: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Mobile / Tablet' : 'Desktop'
                         })
                     });
